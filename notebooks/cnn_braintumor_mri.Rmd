@@ -1,0 +1,960 @@
+---
+title: "R Notebook"
+output: html_document
+---
+
+```{r}
+library(latex2exp)
+library(ramify)
+library(imageseg)
+library(caret)
+library(tools)
+library(xfun)
+library(EBImage)
+library(stringi)
+library(ROCR)
+library(pROC)
+library(reticulate)
+library(tensorflow)
+library(keras)
+library(keras3)
+library(imager)
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(skimr)
+library(tm)
+library(RWeka)
+library(e1071)
+library(scales)
+library(cutpointr)
+library(magick)
+library(superml)
+library(grid)
+library(crayon)
+library(stringr)
+library(cowplot)
+library(patchwork)
+
+# Set the working directory
+setwd("C:/Ngoc/MastersThesis/Draft")
+
+main_folder <- "MRI_brain_images/Axial"
+class_folders <- list.dirs(main_folder, full.names = FALSE) # -> class_folders[1] is an empty string 
+class_folders <- stri_remove_empty(class_folders, na_empty = TRUE)
+```
+
+### A/ Find training and test set AUC for a built - from - scratch CNN model:
+
+Unlike some preprocessing steps in tabular data (like normalization / standardization, filling in missing values, ...), format conversion and resizing do not involve calculations and transformations based on data distributions that may affect the learning process of the model. These two steps are just used to ensure consistent input format and size for the model to work properly on the dataset. Therefore, instead of:
+
+-   Checking for any inconsistencies in the format of the images based on just the training set, then based on the result, convert all images from the training, validation and test set to the same format,
+
+-   As well as finding the range of image height and width from just the training set, then based on the result, resize all images to the same size,
+
+We can:
+
+-   Check for any inconsistencies in the format of the images based on the whole dataset, then based on the result, convert all images from the training, validation and test set to the same format,
+
+-   As well as finding the range of image height and width from the whole dataset, then based on the result, resize all images to the same size.
+
+For this approach, we only need to apply resizing and format conversion steps once at the begining then save the processed images for future code runs, instead of having to re - run these steps every time we split the train - validation - test set differently. This is practical and helps simplify the coding process.
+
+#### 1. Check for any inconsistencies in the format of the images:
+
+```{r}
+# ############## Turn to comments from the second run onwards ###############
+# num_gray = 0
+# num_rgb = 0
+# num_other = 0
+# 
+# for (class_folder in class_folders){
+#   directory <- file.path(main_folder, class_folder)
+#   files <- list.files(directory, full.names = TRUE, pattern = "\\.jpg$")
+#   for (file in files){
+#     tryCatch(
+#       {
+#         img <- image_read(file)
+#         info <- image_info(img)
+#         if (info$colorspace == "Gray"){
+#           num_gray = num_gray + 1
+#         }
+#         else if (info$colorspace == "sRGB"){
+#             num_rgb = num_rgb + 1
+#         }
+#         else {
+#           num_other = num_other + 1
+#           cat("Image format: ", info$colorspace, "\n", file, "\n\n")
+#         }
+#       },
+#       error = function(e)
+#       {
+#       cat("An exception occurred:", e$message, "\n", file, "\n\n")
+#       })
+#   }
+# }
+# 
+# cat("Number of Grayscale images:", num_gray, "\n")
+# cat("Number of RGB images:", num_rgb, "\n")
+# cat("Number of other types of images:", num_other, "\n")
+# 
+# # -> The dataset contains 1026 images in Grayscale format and 2543 images in RGB format
+```
+
+#### **2.** Convert all images with RGB format into Grayscale format:
+
+```{r}
+# ############## Turn to comments from the second run onwards ###############
+# for (class_folder in class_folders){
+#   directory <- file.path(main_folder, class_folder)
+#   files <- list.files(directory, full.names = TRUE, pattern = "\\.jpg$")
+#   for (file in files){
+#     tryCatch(
+#       {
+#         img <- image_read(file)
+#         info <- image_info(img)
+#         if (info$colorspace == "sRGB"){
+#           # Turn RGB images into Grayscale, only keep values from the Red channel
+#           img_gray <- image_channel(img, channel = "Red")
+# 
+#           # Convert a magick object into a cimg image
+#           image <- magick2cimg(img_gray)
+# 
+#           # Save the change into the original dataset
+#           save.image(image, file)
+#         }
+#       },
+#       error = function(e)
+#       {
+#       cat("An exception occurred:", e$message, "\n", file, "\n\n")
+#       })
+#   }
+# }
+```
+
+#### **3. Find the range of image height and width in the dataset:**
+
+```{r}
+# ############## Turn to comments from the second run onwards ###############
+# min_width <- Inf
+# max_width <- 0
+# min_height <- Inf
+# max_height <- 0
+# widths <- list()
+# heights <- list()
+# 
+# for (class_folder in class_folders){
+#   directory <- file.path(main_folder, class_folder)
+#   files <- list.files(directory, full.names = TRUE, pattern = "\\.jpg$")
+#   for (file in files){
+#     tryCatch(
+#       {
+#         img <- load.image(file)
+#         width <- dim(img)[1]
+#         height <- dim(img)[2]
+#         widths <- c(widths, width)
+#         heights <- c(heights, height)
+# 
+#         if (width < min_width){
+#           min_width <- width
+#         }
+#         if (width > max_width){
+#           max_width <- width
+#         }
+#         if (height < min_height){
+#           min_height <- height
+#         }
+#         if (height > max_height){
+#           max_height <- height
+#         }
+#       },
+#       error = function(e)
+#       {
+#       cat("An exception occurred:", e$message, "\n", file, "\n\n")
+#       })
+#   }
+# }
+# 
+# cat("The range of image width:", min_width, " - ", max_width, "pixels \n")
+# cat("The range of image height:", min_height, " - ", max_height, "pixels \n")
+```
+
+```{r}
+# # Distribution of image widths and heights
+# hist(unlist(widths), main = "Distribution of Image Widths",
+#      xlab = "Width (pixels)", ylab = "Frequency", col = "lightblue",
+#      xlim = c(0, 2000), ylim = c(0, 2000), border = "black")
+# 
+# hist(unlist(heights), main = "Distribution of Image Heights",
+#      xlab = "Height (pixels)", ylab = "Frequency", col = "lightblue",
+#      xlim = c(0, 2500), ylim = c(0, 2000), border = "black")
+```
+
+#### 4. Resize all images into size 200 x 200 pixels:
+
+```{r}
+# ############## Turn to comments from the second run onwards ###############
+# resize <- function(directory)
+# {
+#   files <- list.files(directory, full.names = TRUE, pattern = "\\.jpg$")
+#   for (file in files)
+#   {
+#     tryCatch(
+#       {
+#       img <- image_read(file)
+# 
+#       # Resize images and adds padding
+#       img_resized <- image_resize(img, geometry = "200x200", filter = "Cubic")
+#       img_resized_padding <- image_extent(img_resized, geometry = "200x200", gravity = "center", color = "black")
+# 
+#       # Convert a magick object into a cimg image
+#       image <- magick2cimg(img_resized_padding)
+# 
+#       # Save the change into the original dataset
+#       save.image(image, file)
+#       },
+#       error = function(e)
+#       {
+#       cat("An exception occurred:", e$message, "\n", file, "\n\n")
+#       })
+#   }
+# }
+# 
+# for (class_folder in class_folders) {
+#   resize(file.path(main_folder, class_folder))
+# }
+```
+
+#### 5. Get the list of images and the list of labels:
+
+```{r}
+# Get the list of image paths and the list of categorical labels 
+image_paths <- list()
+labels <- list()
+for (class_folder in class_folders) {
+  images <- list.files(file.path(main_folder, class_folder), full.names = TRUE, pattern = "\\.jpg$")
+  image_paths <- c(image_paths, images)
+  labels <- c(labels, rep(class_folder, length(images)))
+}
+
+# Load the images
+X <- lapply(unlist(image_paths), load.image)
+```
+
+#### 6. **Split training - test - validation set:**
+
+```{r}
+set.seed(1)
+
+# Shuffle X and labels in the same order to make sure the label values appear in a random order 
+shuffle_indices <- sample(1:length(X))
+X <- X[shuffle_indices]
+labels <- labels[shuffle_indices]
+
+# Split train : test : val as 70 : 20 : 10
+train_indices_temp <- createDataPartition(unlist(labels), p = 0.8, list = FALSE)
+test_indices <- setdiff(seq_along(unlist(labels)), train_indices_temp)
+# -> seq_along(x) creates a sequence of integers with the same length as x
+
+X_train_temp <- X[train_indices_temp]
+labels_train_temp <- labels[train_indices_temp]
+X_test <- X[test_indices]
+labels_test <- labels[test_indices]
+
+val_indices <- createDataPartition(unlist(labels_train_temp), p = 0.125, list = FALSE)
+train_indices <- setdiff(seq_along(unlist(labels_train_temp)), val_indices)
+
+X_train <- X_train_temp[train_indices]
+labels_train <- labels_train_temp[train_indices]
+X_val <- X_train_temp[val_indices]
+labels_val <- labels_train_temp[val_indices]
+# (train: 0.875 x 0.8 = 0.7 ; val: 0.125 x 0.8 = 0.1)
+
+# Examine the size of the training, validation, and test sets
+cat("Train set's size: X_train =", length(X_train), ", y_train =", length(labels_train), "\n")
+cat("Validation set's size: X_val =", length(X_val), ", y_val =", length(labels_val), "\n")
+cat("Test set's size: X_test =", length(X_test), ", y_test =", length(labels_test), "\n")
+```
+
+```{r}
+# Check the pixel value range of training images
+cat("Pixel value range of training images: [", min(unlist(X_train)), ", ", max(unlist(X_train)), "] \n", sep = "")
+# -> All training images are already normalized 
+```
+
+#### 7. Check for class distribution in training set:
+
+```{r fig.width=8, fig.height=6}
+count <- as.numeric(table(unlist(labels_train)))
+bp <- barplot(table(unlist(labels_train)), main = "Class distribution in Training Set", col = c("aquamarine3", "lightcoral", "steelblue3", "plum3"), ylim = c(0, 1500), xlab = "Brain Tumor Class", ylab = "Number of Samples")
+text(x = bp, y = count, label = count, cex = 0.9, pos = 3, col = "black")
+```
+
+#### 8. Apply other preprocessing steps:
+
+```{r fig.width=10, fig.height=8}
+class_counts <- sort(table(unlist(labels_train)), decreasing = TRUE)  # Sort the class names in decreasing order to minimize data imbalance in each Adjusted OvR problem 
+class <- names(class_counts)
+
+label_map <- c("NoTumor" = "NoT", "Glioma" = "Gl", "Meningioma" = "Mn", "Pituitary" = "Pt")  # Shorten the labels 
+
+layout_ <- matrix(c(1, 1, 2, 2, 
+                    0, 3, 3, 0), nrow = 2, byrow = TRUE)  
+
+layout(layout_) # Create 3 subplots with 2 rows, centering the 3rd subplot 
+par(oma = c(1,1,2,1), mar = c(4,5,4,4)) # mar changes the spacing of each plot from (bottom, left, top, right)
+
+# Check for class imbalance in training set of each model in OvR approach
+for(i in 1:(length(class) - 1)){
+  remaining_classes <- class[i:length(class)]
+  labels_train_ovr_plt <- unlist(labels_train)[unlist(labels_train) %in% remaining_classes]
+  
+  # Convert the response variable to binary
+  labels_train_ovr_plt <- ifelse(labels_train_ovr_plt == class[i], 1, 0)  # Returns result in numeric format
+  labels_train_ovr_plt  <- factor(labels_train_ovr_plt, levels = c("1", "0"))  # Convert to factor, arrange the order of labels to be positive before negative for the barplot order 
+
+  # Check for class imbalance
+  count <- as.numeric(table(labels_train_ovr_plt))
+  neg_labels <- paste(label_map[remaining_classes[-1]], collapse = ", ")
+
+  if (i == length(class) - 1) {
+    # Last model - only two classes left
+    custom_labels <- ifelse(names(table(labels_train_ovr_plt)) == "1", paste0(label_map[class[i]]), paste0(neg_labels))
+    plot_title <- paste0(label_map[class[i]], " vs ", neg_labels)
+    }
+  else {
+    # Other models
+    custom_labels <- ifelse(names(table(labels_train_ovr_plt)) == "1", paste0(label_map[class[i]]), paste0("(", neg_labels, ")"))
+    plot_title <- paste0(label_map[class[i]], " vs ", "(", neg_labels, ")")
+    }
+  bp <- barplot(table(labels_train_ovr_plt), names.arg = custom_labels, main = plot_title, cex.main = 1.4, cex.axis = 1.6, cex.lab = 1.6, cex.names = 1.6, col = c("aquamarine3", "lightcoral"), ylim = c(0, 2500), xlab = "Brain Tumor Class", ylab = "Number of Samples")
+  text(x = bp, y = count, label = count, cex = 1.6, pos = 3, col = "black")
+}
+
+mtext(expression(bold("Class distribution in Training Set of each Adjusted OvR problem \n")), side = 3, line = -1.5, outer = TRUE)
+
+# -> Class pairs: All class pairs are not heavily imbalanced 
+# (Gl vs (Mn, Pt) only has mild imbalance with the ratio between the two classes being around 35:65)
+```
+
+```{r}
+# Reshape the images
+xtr <- do.call(abind, X_train)
+xv <- do.call(abind, X_val)
+xte <- do.call(abind, X_test)
+
+X_train_ <- aperm(xtr, perm = c(4,1,2,3))
+X_val_ <- aperm(xv, perm = c(4,1,2,3))
+X_test_ <- aperm(xte, perm = c(4,1,2,3))
+# aperm() transposes the array so that the order of the dimensions specified in "dim" is changed to a new order in "perm": (300, 300, 1, length(X))
+
+## Show some samples in the dataset
+# Display the 1005th image from the Training set
+plot(as.cimg(X_train_[1005,,,])) 
+title(main = "Sample from Training Set", sub = paste0("Class: ", unlist(labels_train)[1005]))
+
+# Display the 420th image from the Test set
+plot(as.cimg(X_test_[420,,,]))
+title(main = "Sample from Test Set", sub = paste0("Class: ", unlist(labels_test)[420]))
+```
+
+```{r}
+# Create list of OvR training sets
+X_train_ovr <- c()
+labels_train_ovr <- c() 
+
+# Add all models in Adjusted OvR approach to the list 
+for(i in 1:(length(class) - 1)){
+  remaining_classes <- class[i:length(class)]
+  labels_train_ovr_ <- unlist(labels_train)[unlist(labels_train) %in% remaining_classes]
+  idx_tr <- which(unlist(labels_train) %in% remaining_classes)
+  X_train_ovr_ <- X_train_[idx_tr,,, , drop = FALSE]
+  
+  # Convert the response variable to binary
+  labels_train_ovr_ <- ifelse(labels_train_ovr_ == class[i], 1, 0)  # Returns result in numeric format
+  
+  # Add to list 
+  X_train_ovr <- append(X_train_ovr, list(X_train_ovr_))
+  labels_train_ovr <- append(labels_train_ovr, list(labels_train_ovr_))
+}
+
+# Create list of OvR test sets 
+X_test_ovr <- c() 
+labels_test_ovr <- c()
+
+for(i in 1:(length(class) - 1)){
+  remaining_classes <- class[i:length(class)]
+  labels_test_ovr_ <- unlist(labels_test)[unlist(labels_test) %in% remaining_classes]
+  idx_te <- which(unlist(labels_test) %in% remaining_classes)
+  X_test_ovr_ <- X_test_[idx_te,,, , drop = FALSE]
+  
+  # Convert the response variable to binary
+  labels_test_ovr_  <- ifelse(labels_test_ovr_ == class[i], 1, 0)  # Returns result in numeric format
+  
+  # Add to list 
+  X_test_ovr <- append(X_test_ovr, list(X_test_ovr_))  
+  labels_test_ovr <- append(labels_test_ovr, list(labels_test_ovr_))
+}
+
+# Create list of OvR validation sets 
+X_val_ovr <- c() 
+labels_val_ovr <- c()
+
+for(i in 1:(length(class) - 1)){
+  remaining_classes <- class[i:length(class)]
+  labels_val_ovr_ <- unlist(labels_val)[unlist(labels_val) %in% remaining_classes]
+  idx_v <- which(unlist(labels_val) %in% remaining_classes)
+  X_val_ovr_ <- X_val_[idx_v,,, , drop = FALSE]
+  
+  # Convert the response variable to binary
+  labels_val_ovr_  <- ifelse(labels_val_ovr_ == class[i], 1, 0)  # Returns result in numeric format
+  
+  # Add to list 
+  X_val_ovr <- append(X_val_ovr, list(X_val_ovr_)) 
+  labels_val_ovr <- append(labels_val_ovr, list(labels_val_ovr_))
+}
+```
+
+#### 9. Build the CNN models:
+
+```{r}
+my_models_ovr <- c()   
+
+for(i in 1:(length(class) - 1)){
+  # Initialize the Sequential model
+  my_model <- keras_model_sequential()  # All OvR models here have the same structure so there's actually no need to create a loop 
+  
+  # Block 1
+  my_model %>%
+    layer_conv_2d(filters = 16, input_shape = c(200, 200, 1), kernel_size = c(3, 3), strides = c(1, 1), padding = 'same', name = 'Block_1_Conv_1') %>%
+    layer_batch_normalization() %>%
+    layer_activation('relu') %>%
+    layer_conv_2d(filters = 32, kernel_size = c(3, 3), strides = c(1, 1), padding = 'same', name = 'Block_1_Conv_2') %>%
+    layer_batch_normalization() %>%
+    layer_activation('relu') %>%
+    layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2), padding = 'same', name = 'Block_1_MaxPool') %>%
+    layer_dropout(rate = 0.2)
+    
+  # Block 2
+  my_model %>%
+    layer_conv_2d(filters = 32, kernel_size = c(3, 3), strides = c(1, 1), padding = 'same', name = 'Block_2_Conv_1') %>%
+    layer_batch_normalization() %>%
+    layer_activation('relu') %>%
+    layer_conv_2d(filters = 64, kernel_size = c(3, 3), strides = c(1, 1), padding = 'same', name = 'Block_2_Conv_2') %>%
+    layer_batch_normalization() %>%
+    layer_activation('relu') %>%
+    layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2), padding = 'same', name = 'Block_2_MaxPool') %>%
+    layer_dropout(rate = 0.2)
+    
+  # Block 3
+  my_model %>%
+    layer_conv_2d(filters = 64, kernel_size = c(3, 3), strides = c(1, 1), padding = 'same', name = 'Block_3_Conv_1') %>%
+    layer_batch_normalization() %>%
+    layer_activation('relu') %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), strides = c(1, 1), padding = 'same', name = 'Block_3_Conv_2') %>%
+    layer_batch_normalization() %>%
+    layer_activation('relu') %>%
+    layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2), padding = 'same', name = 'Block_3_MaxPool') %>%
+    layer_dropout(rate = 0.2)
+
+  # Flatten
+  my_model %>%
+    layer_flatten()
+
+  # Fully connected (FC) layer 1
+  my_model %>%
+    layer_dense(units = 64) %>%
+    layer_batch_normalization() %>%
+    layer_activation('relu') %>%
+    layer_dropout(rate = 0.4)
+
+  # Fully connected (FC) layer 2
+  my_model %>%
+    layer_dense(units = 1) %>%
+    layer_activation('sigmoid')
+  
+  my_models_ovr <- append(my_models_ovr, list(my_model))
+}
+
+# Summary of each model structure
+cat(crayon::bold("Structure of each OvR model: \n"))
+summary(my_models_ovr[[1]])
+```
+
+#### 10. Compile the models:
+
+```{r}
+pos_class <- head(class, -1)  # head(class, -1) is class without the last element 
+
+lr_ovr <- c()
+lr_ovr <- ifelse(pos_class == "NoTumor", 0.01, ifelse(pos_class == "Glioma", 0.005, 0.005))
+
+for(i in 1:(length(class) - 1)){
+  my_models_ovr[[i]] %>%
+    compile(loss = 'binary_crossentropy', optimizer = optimizer_sgd(learning_rate = lr_ovr[i], momentum = 0.8), metrics = list('AUC'))
+}
+```
+
+#### 11. Train the models:
+
+```{r}
+# ############## Turn to comments from the second run onwards ###############
+# history_list <- c()
+# epoch_ovr <- c()
+# epoch_ovr <- ifelse(pos_class == "NoTumor", 10, ifelse(pos_class == "Glioma", 20, 25))
+# 
+# for(i in 1:(length(class) - 1)){
+#   remaining_classes <- class[i:length(class)]
+#   neg_labels <- paste0(label_map[remaining_classes[-1]], collapse = ", ")
+#   neg_labels_ <- paste0(label_map[remaining_classes[-1]], collapse = "-")
+# 
+#   if (i == length(class) - 1) {
+#     # Last model - only two classes left
+#     msg <- paste0("Adjusted OvR model ", label_map[class[i]], " vs ", neg_labels, ": \n")
+#     cat(crayon::bold(msg))
+#     }
+#   else {
+#     # Other models
+#     msg <- paste0("Adjusted OvR model ", label_map[class[i]], " vs ", "(", neg_labels, "): \n")
+#     cat(crayon::bold(msg))
+#   }
+# 
+#   # Create a callback ModelCheckpoint for each OvR problem. This callback will save the model weights when finding one better than the current best
+#   checkpoint_filepath <- paste0("braintumor_best_model_weights_", label_map[class[i]], "_vs_", neg_labels_, ".h5")
+# 
+#   mc <- callback_model_checkpoint(filepath = checkpoint_filepath, monitor = "val_loss", save_best_only = TRUE, save_weights_only = TRUE, save_freq = "epoch", verbose = 0)
+# 
+#   # Train the model
+#   history <- my_models_ovr[[i]] %>%
+#     fit(X_train_ovr[[i]], labels_train_ovr[[i]], batch_size = 16, epochs = epoch_ovr[i], verbose = 1, validation_data = list(X_val_ovr[[i]], labels_val_ovr[[i]]), callbacks = list(mc))
+#   history_list <- append(history_list, list(history))
+#   cat("\n")
+# }
+```
+
+#### 12. Plot training and validation AUC:
+
+```{r}
+# ############### Turn to comments from the second run onwards ###############
+# # Plot training and validation loss and AUC:
+# for(i in 1:(length(class) - 1)){
+#   remaining_classes <- class[i:length(class)]
+#   neg_labels <- paste0(label_map[remaining_classes[-1]], collapse = ", ")
+# 
+#   if (i == length(class) - 1) {
+#     # Last model - only two classes left
+#     msg <- paste0("Adjusted OvR model ", label_map[class[i]], " vs ", neg_labels, ": \n")
+#     cat(crayon::bold(msg))
+#     }
+#   else {
+#     # Other models
+#     msg <- paste0("Adjusted OvR model ", label_map[class[i]], " vs ", "(", neg_labels, "): \n")
+#     cat(crayon::bold(msg))
+#     }
+# 
+#   print(plot(history_list[[i]]))
+#   cat("\n")
+# }
+```
+
+#### 13. Using the saved best model weights, evaluate the model's AUC on training and test set:
+
+```{r}
+output_train_ovr <- data.frame()
+output_test_ovr <- data.frame()
+labels_test_pred_ovr <- c()
+
+for(i in 1:(length(class) - 1)){
+  remaining_classes <- class[i:length(class)]
+  neg_labels <- paste0(label_map[remaining_classes[-1]], collapse = ", ")
+  neg_labels_ <- paste0(label_map[remaining_classes[-1]], collapse = "-")
+  
+  if (i == length(class) - 1) {
+    # Last model - only two classes left
+    mod <- paste0(label_map[class[i]], " vs ", neg_labels)
+    }
+  else {
+    # Other models
+    mod <- paste0(label_map[class[i]], " vs ", "(", neg_labels, ")")
+  }
+  
+  # Load the saved best model weights to the model
+  weights_filepath <- paste0("braintumor_best_model_weights_", label_map[class[i]], "_vs_", neg_labels_, ".h5")
+  my_models_ovr[[i]] %>% load_model_weights_tf(weights_filepath)
+
+  ### Evaluate the model on training set: 
+  eval_train <- evaluate(my_models_ovr[[i]], X_train_ovr[[i]], labels_train_ovr[[i]], verbose = 0)     # Compute training loss and AUC
+
+  ### Evaluate the model on test set:
+  labels_test_pred <- predict(my_models_ovr[[i]], X_test_ovr[[i]], verbose = 0)
+  labels_test_pred_ovr <- append(labels_test_pred_ovr, list(labels_test_pred))
+  
+  eval_test <- evaluate(my_models_ovr[[i]], X_test_ovr[[i]], labels_test_ovr[[i]], verbose = 0)      # Compute test loss and AUC
+
+  output_train_ovr <- rbind(output_train_ovr, data.frame(Model = mod, Loss = eval_train[1], AUC = eval_train[2]))
+  output_test_ovr <- rbind(output_test_ovr, data.frame(Model = mod, Loss = eval_test[1], AUC = eval_test[2]))
+}
+
+labels_test_pred_ovr <- lapply(labels_test_pred_ovr, as.vector)
+
+rownames(output_train_ovr) <- NULL
+rownames(output_test_ovr) <- NULL
+
+cat("Loss and AUC on the training set for each Adjusted OvR model: \n")
+print(output_train_ovr)
+cat("\n")
+
+cat("Loss and AUC on the test set for each Adjusted OvR model: \n")
+print(output_test_ovr)
+```
+
+### **B/ Choosing decision threshold by ROC curve and decision curve:**
+
+#### 1. **Criterias to determine the decision threshold for the CNN model:**
+
+```{r}
+mod_names <- c()
+
+for (i in 1:(length(class) - 1)) {
+  remaining_classes <- class[i:length(class)]
+  neg_labels <- paste0(label_map[remaining_classes[-1]], collapse = ", ")
+  
+  if (i == length(class) - 1) {
+    # Last model - only two classes left
+    mod_name <- paste0(label_map[class[i]], " vs ", neg_labels)
+  } 
+  else {
+    # Other models
+    mod_name <- paste0(label_map[class[i]], " vs ", "(", neg_labels, ")")
+  }
+  
+  mod_names <- c(mod_names, mod_name)
+}
+```
+
+-   **Youden index criterion:**
+
+```{r}
+# Optimal thresholds obtained by maximizing youden index
+j_threshold <- function(y_true, y_pred) {
+  roc_obj <- pROC::roc(y_true, y_pred)
+  fpr <- 1 - roc_obj$specificities
+  tpr <- roc_obj$sensitivities
+  thresholds <- roc_obj$thresholds
+  j <- tpr - fpr
+  j <- sort(j, decreasing = TRUE, index.return = TRUE)
+  j_ordered <- data.frame(j = j[1], thresholds = thresholds[rank(j$ix)])
+  for (k in 1:nrow(j_ordered)){
+    if (is.finite(j_ordered$thresholds[k])) {
+      return(j_ordered$thresholds[k])
+      break
+      }
+  }
+}
+
+cj_ovr <- c()
+
+for (i in 1:(length(class) - 1)){
+  cj <- j_threshold(labels_test_ovr[[i]], labels_test_pred_ovr[[i]])
+  cj_ovr <- append(cj_ovr, cj)
+}
+
+names(cj_ovr) <- mod_names 
+
+cj_ovr
+```
+
+-   **Closest to (0,1) criterion:**
+
+```{r}
+# Optimal threshold obtained by maximizing sensitivity and specificity to the extent that both are closest to 100%
+d_threshold <- function(y_true, y_pred) {
+  roc_obj <- pROC::roc(y_true, y_pred)
+  fpr <- 1 - roc_obj$specificities
+  tpr <- roc_obj$sensitivities
+  thresholds <- roc_obj$thresholds
+  d <- sapply(1:length(fpr), function(i) sqrt((1 - tpr[i])^2 + (fpr[i])^2))
+  d <- sort(d, decreasing = FALSE, index.return = TRUE)
+  d_ordered <- data.frame(d = d[1], thresholds = thresholds[rank(d$ix)])
+  for (k in 1:nrow(d_ordered)){
+    if (is.finite(d_ordered$thresholds[k])) {
+      return(d_ordered$thresholds[k])
+      break
+      }
+  }
+}
+
+cd_ovr <- c()
+
+for (i in 1:(length(class) - 1)){
+  cd <- d_threshold(labels_test_ovr[[i]], labels_test_pred_ovr[[i]])
+  cd_ovr <- append(cd_ovr, cd)
+}
+
+names(cd_ovr) <- mod_names
+
+cd_ovr
+```
+
+-   **Symetric point criterion:**
+
+```{r}
+# Optimal threshold obtained by finding the point where sensitivity and specificity are equivalent
+s_threshold <- function(y_true, y_pred) {
+  roc_obj <- pROC::roc(y_true, y_pred)
+  fpr <- 1 - roc_obj$specificities
+  tpr <- roc_obj$sensitivities
+  thresholds <- roc_obj$thresholds
+  s <- abs(fpr + tpr - 1)
+  s <- sort(s, decreasing = FALSE, index.return = TRUE)
+  s_ordered <- data.frame(s = s[1], thresholds = thresholds[rank(s$ix)])
+  for (k in 1:nrow(s_ordered)){
+    if (is.finite(s_ordered$thresholds[k])) {
+      return(s_ordered$thresholds[k])
+      break
+      }
+  }
+}
+
+cs_ovr <- c()
+
+for (i in 1:(length(class) - 1)){
+  cs <- s_threshold(labels_test_ovr[[i]], labels_test_pred_ovr[[i]])
+  cs_ovr <- append(cs_ovr, cs)
+}
+
+names(cs_ovr) <- mod_names
+
+cs_ovr
+```
+
+#### 2. Plot ROC curve, decision curve and optimal thresholds for the CNN model:
+
+```{r fig.width=10, fig.height=8}
+# Plot ROC curve
+thresholds_cnn_ovr <- c()
+plot_list <- c() 
+
+for (i in 1:(length(class) - 1)){
+  roc_obj <- pROC::roc(labels_test_ovr[[i]], labels_test_pred_ovr[[i]])
+  thresholds_cnn <- roc_obj$thresholds
+  thresholds_cnn_ovr <- append(thresholds_cnn_ovr, list(thresholds_cnn))
+  roc_data <- data.frame(fpr = rev(1 - roc_obj$specificities), tpr = rev(roc_obj$sensitivities))
+
+  for (k in 1:length(roc_obj$thresholds)){
+    if (roc_obj$thresholds[k] == cj_ovr[i]){
+      specificity_j <- roc_obj$specificities[k]
+      sensitivity_j <- roc_obj$sensitivities[k]
+    }
+    if (roc_obj$thresholds[k] == cd_ovr[i]){
+      specificity_d <- roc_obj$specificities[k]
+      sensitivity_d <- roc_obj$sensitivities[k]
+    }
+    if (roc_obj$thresholds[k] == cs_ovr[i]){
+      specificity_s <- roc_obj$specificities[k]
+      sensitivity_s <- roc_obj$sensitivities[k]
+    }
+  }
+
+  diagonal_data <- data.frame(x = seq(0, 1, length.out = 100), y = 1 - seq(0, 1, length.out = 100))
+  thresholds_data <- data.frame(x1 = 0, x2 = 1 - specificity_d, y1 = 1, y2 = sensitivity_d)
+  sp_se_j <- data.frame(sp = specificity_j, se = sensitivity_j)
+  sp_se_d <- data.frame(sp = specificity_d, se = sensitivity_d)
+  sp_se_s <- data.frame(sp = specificity_s, se = sensitivity_s)
+  
+  remaining_classes <- class[i:length(class)]
+  neg_labels <- paste0(label_map[remaining_classes[-1]], collapse = ", ")
+  
+  if (i == length(class) - 1) {
+    # Last model - only two classes left
+    plot_title <- paste0(label_map[class[i]], " vs ", neg_labels)
+    }
+  else {
+    # Other models
+    plot_title <- paste0(label_map[class[i]], " vs ", "(", neg_labels, ")")
+    }
+
+  rc <- ggplot(data = roc_data, aes(x = fpr, y = tpr)) +
+  geom_line(linetype = "solid", linewidth = 1, col = "blue") +
+  geom_line(data = diagonal_data, aes(x = x, y = y), linetype = "dashed", linewidth = 1, col = "orange") +
+  geom_segment(data = thresholds_data, aes(x = x1, y = y1, xend = x2, yend = y2), linetype = "dotdash", linewidth = 1, col = "pink") +
+  geom_point(data = sp_se_j, aes(x = 1 - sp, y = se, col = "c_j"), size = 4, show.legend = TRUE) +
+  geom_point(data = sp_se_d, aes(x = 1 - sp, y = se, col = "c_d"), size = 4, show.legend = TRUE) +
+  geom_point(data = sp_se_s, aes(x = 1 - sp, y = se, col = "c_s"), size = 4, show.legend = TRUE) +
+  labs(x = "False positive rate", y = "True positive rate") + ggtitle(plot_title) +
+  scale_color_manual(name = "Threshold: ", labels = unname(TeX(c("At $\\hat{c}_{J}$", "At $\\hat{c}_{D}$", "At $\\hat{c}_{S}$"))), values=c("red", "purple", "green")) +
+  theme_bw() +
+  theme(plot.title = element_text(face="bold", hjust = 0.5, size = 13)) 
+  plot_list[[i]] <- rc 
+}
+
+names(plot_list) <- c("A", "B", "C")
+
+layout <- "AABB
+           #CC#"
+
+# Combine all plots in the list into a grid layout (2 columns)
+combined_plot <- wrap_plots(plot_list, design = layout, ncol = 2)
+
+legend <- get_legend(plot_list[[1]])
+
+# Arrange the combined plot with a shared legend and title
+final_plot <- combined_plot + plot_layout(guides = "collect") & 
+  theme(plot.margin = unit(c(2, 1, 0, 1), "lines"), legend.position = "bottom", legend.background = element_rect(color = "black", size = 0.5, linetype = "solid"), legend.text = element_text(size = 11), legend.box.margin = unit(c(0.6, 1, 1, 1), "lines"))   # Add 2 lines at the top (plot.margin = unit(c(top,right,bottom,left), "lines")
+
+print(final_plot)
+grid.text("ROC curve of each Adjusted OvR problem", x = 0.5, y = 0.94, gp = gpar(fontsize = 14, fontface = "bold"))
+```
+
+```{r fig.width=10, fig.height=8}
+# Plot decision curve
+
+# Net benefit function
+nb <- function(y_true, y_pred, c, prev){
+  roc_obj <- pROC::roc(y_true, y_pred)
+  for (i in 1:length(roc_obj$thresholds)){
+    if (roc_obj$thresholds[i] == c){
+      se_c <- roc_obj$sensitivities[i]
+      sp_c <- roc_obj$specificities[i]
+      break
+    }
+  }
+  phi_c <- se_c * prev - (1 - sp_c) * (1 - prev) * c/(1 - c)
+  return(phi_c)
+}
+
+plot_list <- c() 
+
+for (i in 1:(length(class) - 1)){
+  # Calculate disease prevalence in the population:
+  # p = number of diseased / total population size (calculate from whole dataset (labels) or just test set (labels_test)?)
+  p <- sum(labels_test_ovr[[i]]) / length(labels_test_ovr[[i]])
+
+  df_cnn <- data.frame(labels_test_pred_ = labels_test_pred_ovr[[i]], labels_test_ = labels_test_ovr[[i]])
+  nb_j <- data.frame(cj = cj_ovr[i], nbj = nb(labels_test_ovr[[i]], labels_test_pred_ovr[[i]], cj_ovr[i], p))
+  nb_d <- data.frame(cd = cd_ovr[i], nbd = nb(labels_test_ovr[[i]], labels_test_pred_ovr[[i]], cd_ovr[i], p))
+  nb_s <- data.frame(cs = cs_ovr[i], nbs = nb(labels_test_ovr[[i]], labels_test_pred_ovr[[i]], cs_ovr[i], p))
+  
+  remaining_classes <- class[i:length(class)]
+  neg_labels <- paste0(label_map[remaining_classes[-1]], collapse = ", ")
+  
+  if (i == length(class) - 1) {
+    # Last model - only two classes left
+    plot_title <- paste0(label_map[class[i]], " vs ", neg_labels)
+    }
+  else {
+    # Other models
+    plot_title <- paste0(label_map[class[i]], " vs ", "(", neg_labels, ")")
+    }
+
+  # For the Decision curve plot, use the thresholds values from ROC curve plot to make sure that the optimal thresholds show on the decision curve correctly
+  dca_obj <- dcurves::dca(labels_test_ ~ labels_test_pred_, data = df_cnn, label = list(labels_test_pred_ = "CNN model"), thresholds = thresholds_cnn_ovr[[i]], prevalence = p) 
+  dc <- plot(dca_obj, smooth = FALSE) + geom_line(linewidth = 1) + 
+    ggtitle(plot_title) +
+    geom_point(data = nb_j, aes(x = cj, y = nbj, col = "c_j"), size = 4, show.legend = TRUE) +
+    geom_point(data = nb_d, aes(x = cd, y = nbd, col = "c_d"), size = 4, show.legend = TRUE) +
+    geom_point(data = nb_s, aes(x = cs, y = nbs, col = "c_s"), size = 4, show.legend = TRUE) +
+    scale_color_manual(labels = unname(TeX(c("Treat All", "Treat None", "CNN model", "At $\\hat{c}_{J}$", "At $\\hat{c}_{D}$", "At $\\hat{c}_{S}$"))), values=c("orange", "pink", "blue", "red", "purple", "green")) +
+    guides(colour = guide_legend(byrow = TRUE, override.aes = list(linetype = c("solid", "solid", "solid", rep("blank", 3)), shape = c(NA, NA, NA, rep(16, 3))))) + theme(plot.title = element_text(face="bold", hjust = 0.5, size = 13))
+  plot_list[[i]] <- dc
+}
+
+names(plot_list) <- c("A", "B", "C")
+
+layout <- "AABB
+           #CC#"
+
+# Combine all plots in the list into a grid layout (2 columns)
+combined_plot <- wrap_plots(plot_list, design = layout, ncol = 2)
+
+legend <- get_legend(plot_list[[1]])
+
+# Arrange the combined plot with a shared legend and title
+final_plot <- combined_plot + plot_layout(guides = "collect") & 
+  theme(plot.margin = unit(c(2, 1, 0, 1), "lines"), legend.position = "bottom", legend.background = element_rect(color = "black", size = 0.5, linetype = "solid"), legend.text = element_text(size = 11), legend.box.margin = unit(c(0.6, 1, 1, 1), "lines"))   # Add 2 lines at the top (plot.margin = unit(c(top,right,bottom,left), "lines")
+
+print(final_plot)
+grid.text("Decision curve of each Adjusted OvR problem", x = 0.5, y = 0.94, gp = gpar(fontsize = 14, fontface = "bold"))
+```
+
+```{r}
+best_thresholds <- c()
+c_res <- c()
+
+for (i in 1:(length(class) - 1)) {
+  p <- sum(labels_test_ovr[[i]]) / length(labels_test_ovr[[i]])
+  
+  nb_j <- nb(labels_test_ovr[[i]], labels_test_pred_ovr[[i]], unname(cj_ovr[i]), p)
+  nb_d <- nb(labels_test_ovr[[i]], labels_test_pred_ovr[[i]], unname(cd_ovr[i]), p)
+  nb_s <- nb(labels_test_ovr[[i]], labels_test_pred_ovr[[i]], unname(cs_ovr[i]), p)
+  nb_values <- c(cj = nb_j, cd = nb_d, cs = nb_s)
+  
+  best_threshold <- names(which.max(nb_values))   # Name of the threshold with highest net benefit
+  best_thresholds <- c(best_thresholds, best_threshold)
+  threshold_map <- list(cj = cj_ovr[i], cd = cd_ovr[i], cs = cs_ovr[i])
+  c_res <- c(c_res, threshold_map[[best_threshold]])   # Get the optimal threshold's value 
+}
+
+cat(crayon::bold("Optimal threshold of each Adjusted OvR model: \n")) 
+for (i in 1:(length(class) - 1)) {
+  cat(mod_names[i], ": ", best_thresholds[i], " = ", c_res[i], "\n", sep = "")
+}
+```
+
+```{r fig.width=10, fig.height=8}
+## Example: Predicting the class of a new data point with CNN model
+new_obs_ <- X_test[2:7]  # Some observations from the test set 
+new_obs <- do.call(abind, new_obs_)
+new_obs <- aperm(new_obs, perm = c(4,1,2,3))
+# In the procedure: You need to preprocess (Convert into the correct format, Resize, Normalize, Reshape, ... in the same method and with the same values calculated from the preprocessing step of the training set) the new data if needed 
+actual_classes <- labels_test[2:7]
+class_preds <- c()
+mods_data <- c()
+
+for (i in 1:nrow(new_obs)) {
+  pred_class <- NA  # Default if no model meets threshold
+  labels_pred_ovr <- c() 
+  
+  # Sequentially check each Adjusted OvR model
+  for (j in 1:(length(class) - 1)) {
+    # Predict probability
+    labels_pred <- predict(my_models_ovr[[j]], new_obs[i,,, , drop = FALSE], verbose = 0)
+    labels_pred <- round(labels_pred, digits = 7)
+    labels_pred_ovr <- c(labels_pred_ovr, labels_pred)
+    
+    # Compare with threshold
+    if (labels_pred >= c_res[j]) {  # thresholds[j] is the optimal threshold for the j-th Adjusted OvR model
+      pred_class <- class[j]  # Predict as the positive class of this model
+      break  # Stop at first model that meets the threshold
+    }
+  }
+  
+  # If none met the threshold, assign to the last class
+  if (is.na(pred_class)) {
+    pred_class <- class[length(class)]
+  }
+  
+  class_preds <- c(class_preds, pred_class)
+  
+  # Save all model's probabilities
+  if (length(labels_pred_ovr) < (length(class) - 1)) {  
+    labels_pred_ovr <- c(labels_pred_ovr, rep(NA, (length(class) - 1) - length(labels_pred_ovr)))   # Making predicted probabilities vector of all samples have the same length 
+  }
+  
+  mods_data[[i]] <- c(paste0("Observation ", i), labels_pred_ovr)
+}
+
+# Final result
+par(mfrow = c(3, 2))  # Create subplots with 2 rows and 3 columns
+
+for (i in 1:nrow(new_obs)){
+  plot(as.cimg(new_obs[i,,,]))
+  title(main =  paste0("Observation ", i, "\n Predicted class: ", class_preds[i], "; Actual class: ", actual_classes[i]), cex.main = 1.4)
+}
+
+# Specifically, each model's predicted probabilities are as follows
+mods_prob <- do.call(rbind, mods_data)
+colnames(mods_prob) <- c("Observation", mod_names)
+mods_prob <- as.data.frame(mods_prob)
+print(mods_prob)
+```
