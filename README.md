@@ -81,7 +81,9 @@ Three CNN models were built using Tensorflow, each corresponding to one of the t
 
 -   Finally, the output layer is defined as a FC layer with 1 unit and sigmoid activation, producing a probability score that indicates the likelihood that an input image belongs to the positive class of the current OvF problem.
 
-![***Figure 2:** Architecture of the CNN model*](images/cnn_diagram.jpg "CNN model architecture")
+![](images/cnn_diagram.jpg "CNN model architecture")
+
+***Figure 2:** Architecture of the CNN model*
 
 All OvF models were trained using the Stochastic Gradient Descent (SGD) optimizer with a momentum of 0.8 and Binary Cross-Entropy (BCE) as the loss function. Model performance was monitored using Area Under the ROC Curve (AUC) and loss on both the training and validation sets across all epochs. Training was performed with a batch size of 16 for all models.
 
@@ -117,11 +119,13 @@ The final OvF models were evaluated using ROC curve, Decision curve and Area Und
 
 ## Results
 
-![***Figure 3:** ROC curves of the 3 OvF models on their corresponding test sets*](images/roc_ovf.jpg "ROC curves of the 3 OvF models on their corresponding test sets")
+![](images/roc_ovf.jpg "ROC curves of the 3 OvF models on their corresponding test sets")
 
-\-
+***Figure 3:** ROC curves of the 3 OvF models on their corresponding test sets*
 
-![***Figure 4:** Decision curves of the 3 OvF models on their corresponding test sets*](images/decision_curve_ovf.jpg "Decision curves of the 3 OvF models on their corresponding test sets")
+![](images/decision_curve_ovf.jpg "Decision curves of the 3 OvF models on their corresponding test sets")
+
+***Figure 4:** Decision curves of the 3 OvF models on their corresponding test sets*
 
 The ROC curves of all 3 OvF models on their corresponding test sets lie close to the top-left corner, indicating strong classification performance. Furthermore, according to the Decision curves of the OvF models on their corresponding test sets, all 3 OvF models provide a higher net benefit than both the “Treat all” and “Treat none” strategies across most classification thresholds, reflecting high clinical utility.
 
@@ -131,7 +135,7 @@ The ROC curves of all 3 OvF models on their corresponding test sets lie close to
 |   Gl vs (Mn, Pt)    |    0.9999    |  0.9955  |
 |      Mn vs Pt       |    1.0000    |  0.9733  |
 
-: ***Table 1:** AUC values ​​of each OvF model on the training and test sets*
+***Table 1:** AUC values ​​of each OvF model on the training and test sets*
 
 The difference in AUC between the training and test sets is negligible for the first two OvF models, and is also relatively small for the Mn vs Pt model. This indicates that none of the binary models showed signs of overfitting. In addition, the AUC values ​​of all 3 OvF models on their corresponding test sets demonstrate excellent classification performance.
 
@@ -141,7 +145,7 @@ The difference in AUC between the training and test sets is negligible for the f
 | Gl vs (Mn, Pt) | 0.8227 | 0.8227 | 0.8052 |
 | Mn vs Pt | 0.0928 | 0.0482 | 0.0251 |
 
-: ***Table 2:** Candidate optimal thresholds for each OvF model based on three criteria*
+***Table 2:** Candidate optimal thresholds for each OvF model based on three criteria*
 
 Candidate optimal thresholds for each OvF model were computed using 3 criteria: *Maximizing Youden Index criterion, Closest to (0, 1) criterion, and Symmetry Point criterion.*
 
