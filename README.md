@@ -14,7 +14,7 @@ This project uses the Brain Tumor MRI dataset, which contains 7023 brain MRI ima
 
 For model training and evaluation, only the axial slices were used, comprising a total of 3,569 images.
 
-![NoTumor](images/notumor.jpg "NoTumor"){width="146"} ![Glioma](images/glioma.jpg "Glioma"){width="148"} ![Meningioma](images/meningioma.jpg "Meningioma"){width="154"} ![Pituitary](images/pituitary.jpg "Pituitary"){width="145"}
+![NoTumor](images/notumor.jpg "NoTumor") ![Glioma](images/glioma.jpg "Glioma") ![Meningioma](images/meningioma.jpg "Meningioma") ![Pituitary](images/pituitary.jpg "Pituitary")
 
 ***Figure 1:** Axial images from the four classes: NoTumor, Glioma, Meningioma and Pituitary*
 
@@ -81,7 +81,7 @@ Three CNN models were built using Tensorflow, each corresponding to one of the t
 
 -   Finally, the output layer is defined as a FC layer with 1 unit and sigmoid activation, producing a probability score that indicates the likelihood that an input image belongs to the positive class of the current OvF problem.
 
-![***Figure 2:** Architecture of the CNN model*](images/cnn_diagram.jpg "CNN model architecture"){width="835"}
+![***Figure 2:** Architecture of the CNN model*](images/cnn_diagram.jpg "CNN model architecture")
 
 All OvF models were trained using the Stochastic Gradient Descent (SGD) optimizer with a momentum of 0.8 and Binary Cross-Entropy (BCE) as the loss function. Model performance was monitored using Area Under the ROC Curve (AUC) and loss on both the training and validation sets across all epochs. Training was performed with a batch size of 16 for all models.
 
@@ -117,11 +117,11 @@ The final OvF models were evaluated using ROC curve, Decision curve and Area Und
 
 ## Results
 
-![***Figure 3:** ROC curves of the 3 OvF models on their corresponding test sets*](images/roc_ovf.jpg "ROC curves of the 3 OvF models on their corresponding test sets"){width="704"}
+![***Figure 3:** ROC curves of the 3 OvF models on their corresponding test sets*](images/roc_ovf.jpg "ROC curves of the 3 OvF models on their corresponding test sets")
 
 \-
 
-![***Figure 4:** Decision curves of the 3 OvF models on their corresponding test sets*](images/decision_curve_ovf.jpg "Decision curves of the 3 OvF models on their corresponding test sets"){width="697"}
+![***Figure 4:** Decision curves of the 3 OvF models on their corresponding test sets*](images/decision_curve_ovf.jpg "Decision curves of the 3 OvF models on their corresponding test sets")
 
 The ROC curves of all 3 OvF models on their corresponding test sets lie close to the top-left corner, indicating strong classification performance. Furthermore, according to the Decision curves of the OvF models on their corresponding test sets, all 3 OvF models provide a higher net benefit than both the “Treat all” and “Treat none” strategies across most classification thresholds, reflecting high clinical utility.
 
