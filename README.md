@@ -57,29 +57,29 @@ While OvR is widely used, it doesn't naturally incorporate classification thresh
 
 By applying the OvF approach, we obtained the following binary problems:
 
--   Classification of the NoTumor class against the other 3 classes, hereafter referred to as the NoT vs (Gl, Mn, Pt) problem;
+- Classification of the NoTumor class against the other 3 classes, hereafter referred to as the NoT vs (Gl, Mn, Pt) problem;
 
--   Classification of the Glioma class against the Meningioma and Pituitary classes, hereafter referred to as the Gl vs (Mn, Pt) problem;
+- Classification of the Glioma class against the Meningioma and Pituitary classes, hereafter referred to as the Gl vs (Mn, Pt) problem;
 
--   Classification of the Meningioma class against the Pituitary class, hereafter referred to as the Mn vs Pt problem.
+- Classification of the Meningioma class against the Pituitary class, hereafter referred to as the Mn vs Pt problem.
 
 Next, the original training, validation, and test sets were transformed for each OvF binary classification task. Specifically:
 
--   For the NoT vs (Gl, Mn, Pt) problem, all images were retained. The NoTumor class was treated as the positive class, while the remaining 3 classes were grouped into the negative class.
+- For the NoT vs (Gl, Mn, Pt) problem, all images were retained. The NoTumor class was treated as the positive class, while the remaining 3 classes were grouped into the negative class.
 
--   For the Gl vs (Mn, Pt) problem, images belonging to the NoTumor class was removed. The Glioma class was treated as the positive class, while the Meningioma and Pituitary classes were grouped into the negative class.
+- For the Gl vs (Mn, Pt) problem, images belonging to the NoTumor class was removed. The Glioma class was treated as the positive class, while the Meningioma and Pituitary classes were grouped into the negative class.
 
--   For the Mn vs Pt problem, images belonging to the NoTumor and Glioma classes were removed. The Meningioma class was treated as the positive class, while the Pituitary class was treated as the negative class.
+- For the Mn vs Pt problem, images belonging to the NoTumor and Glioma classes were removed. The Meningioma class was treated as the positive class, while the Pituitary class was treated as the negative class.
 
 Three CNN models were built using Tensorflow, each corresponding to one of the three OvF binary problems. The structure of each model is built following these steps:
 
--   A sequential model was initialized, with the input defined as a grayscale image of 200 $\times$ 200 pixels.
+- A sequential model was initialized, with the input defined as a grayscale image of 200 $\times$ 200 pixels.
 
--   Feature extraction is performed using 6 convolutional layers organized into 3 convolutional blocks, with increasing numbers of filters (16, 32, 32, 64, 64, and 128). All convolutional layers use 3 $\times$ 3 kernels, followed by batch normalization and ReLU activation. Max pooling layers with a 2 $\times$ 2 pool size and dropout layers with a dropout rate of 0.2 are added at the end of every convolutional block.
+- Feature extraction is performed using 6 convolutional layers organized into 3 convolutional blocks, with increasing numbers of filters (16, 32, 32, 64, 64, and 128). All convolutional layers use 3 $\times$ 3 kernels, followed by batch normalization and ReLU activation. Max pooling layers with a 2 $\times$ 2 pool size and dropout layers with a dropout rate of 0.2 are added at the end of every convolutional block.
 
--   The extracted feature maps are flattened using a flatten layer and passed to a fully connected (FC) layer with 64 units, followed by batch normalization, ReLU activation, and a dropout layer with a dropout rate of 0.4.
+- The extracted feature maps are flattened using a flatten layer and passed to a fully connected (FC) layer with 64 units, followed by batch normalization, ReLU activation, and a dropout layer with a dropout rate of 0.4.
 
--   Finally, the output layer is defined as a FC layer with 1 unit and sigmoid activation, producing a probability score that indicates the likelihood that an input image belongs to the positive class of the current OvF problem.
+- Finally, the output layer is defined as a FC layer with 1 unit and sigmoid activation, producing a probability score that indicates the likelihood that an input image belongs to the positive class of the current OvF problem.
 
 ![](images/cnn_diagram.jpg "CNN model architecture")
 
@@ -149,11 +149,11 @@ The difference in AUC between the training and test sets is negligible for the f
 
 Candidate optimal thresholds for each OvF model were computed using 3 criteria: *Maximizing Youden Index criterion, Closest to (0, 1) criterion, and Symmetry Point criterion.*
 
--   *NoT vs (Gl, Mn, Pt):* All three candidate thresholds for the model are equal to 0.7513. Therefore, the threshold of 0.7513 is the model's final optimal classification threshold.
+- *NoT vs (Gl, Mn, Pt):* All three candidate thresholds for the model are equal to 0.7513. Therefore, the threshold of 0.7513 is the model's final optimal classification threshold.
 
--   *Gl vs (Mn, Pt):* Among the candidate thresholds for the model, the threshold of 0.8227 provides the highest net benefit and is therefore selected as the model's final optimal classification threshold.
+- *Gl vs (Mn, Pt):* Among the candidate thresholds for the model, the threshold of 0.8227 provides the highest net benefit and is therefore selected as the model's final optimal classification threshold.
 
--   *Mn vs Pt:* Among the candidate thresholds for the model, the threshold of 0.0251 yields the highest net benefit and is therefore selected as the model's final optimal classification threshold.
+- *Mn vs Pt:* Among the candidate thresholds for the model, the threshold of 0.0251 yields the highest net benefit and is therefore selected as the model's final optimal classification threshold.
 
 ## References
 
