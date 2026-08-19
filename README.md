@@ -1,4 +1,4 @@
-# Brain Tumor MRI Image Classification Using an OvF Strategy with CNNs
+# Brain Tumor MRI Image Classification Using a One-vs-Followers Strategy with CNNs
 
 ## Overview
 
