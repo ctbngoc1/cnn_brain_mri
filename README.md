@@ -1,4 +1,4 @@
-# Brain Tumor MRI Image Classification Using a OvF Strategy with CNNs
+# Brain Tumor MRI Image Classification Using an OvF Strategy with CNNs
 
 ## Overview
 
@@ -140,7 +140,7 @@ The ROC curves of all 3 OvF models on their corresponding test sets lie close to
 The difference in AUC between the training and test sets is negligible for the first two OvF models, and is also relatively small for the Mn vs Pt model. This indicates that none of the binary models showed signs of overfitting. In addition, the AUC values ​​of all 3 OvF models on their corresponding test sets demonstrate excellent classification performance.
 
 | OvF model | Maximizing Youden Index Threshold | Closest to (0,1) Threshold | Symmetry Point Threshold |
-|:--:|:--:|:--:|:--:|
+|:----------------:|:----------------:|:----------------:|:----------------:|
 | NoT vs (Gl, Mn, Pt) | 0.7513 | 0.7513 | 0.7513 |
 | Gl vs (Mn, Pt) | 0.8227 | 0.8227 | 0.8052 |
 | Mn vs Pt | 0.0928 | 0.0482 | 0.0251 |
